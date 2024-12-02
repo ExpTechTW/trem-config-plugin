@@ -1,23 +1,22 @@
-const logger = require("./utils/logger");
 const fs = require("fs-extra");
 const yaml = require("js-yaml");
-const { app } = require("@electron/remote");
 const path = require("path");
 
 class Config {
   static instance = null;
 
-  constructor() {
+  constructor(logger, defaultDir, configDir) {
     if (Config.instance)
       return Config.instance;
+
+    this.logger = logger;
 
     this.default_config = {};
     this.config = {};
 
-    this.defaultDir = path.join(__dirname, "../../resource/config/default.yml");
-    this.configDir = path.join(app.getPath("userData"), "user/config.yml");
+    this.defaultDir = defaultDir;
+    this.configDir = configDir;
 
-    this.initIPC();
     this.checkConfigExists();
     this.readDefaultYaml();
     this.readConfigYaml();
@@ -29,29 +28,26 @@ class Config {
   resetConfig() {
     try {
       fs.copyFileSync(this.defaultDir, this.configDir);
-      logger.info("Config has been reset to default");
+      this.logger.info("Config has been reset to default");
       this.readConfigYaml();
 
       if (ipcRenderer)
         ipcRenderer.send("config-updated");
 
     } catch (error) {
-      logger.error("Failed to reset config:", error);
+      this.logger.error("Failed to reset config:", error);
     }
   }
 
   static getInstance() {
     if (!Config.instance)
       new Config();
-
-
     return Config.instance;
   }
 
   checkConfigExists() {
     if (!fs.existsSync(this.configDir))
       fs.copySync(this.defaultDir, this.configDir);
-
   }
 
   readDefaultYaml() {
@@ -65,7 +61,7 @@ class Config {
   }
 
   writeConfig(config = this.config) {
-    logger.debug("Writing config:", JSON.stringify(config, null, 2));
+    this.logger.debug("Writing config:", JSON.stringify(config, null, 2));
 
     const lines = [];
     let configContent = fs.readFileSync(this.defaultDir, "utf8");
@@ -79,7 +75,7 @@ class Config {
       if (keyMatch) {
         currentKey = keyMatch[1] || keyMatch[2];
         const value = config[currentKey];
-        logger.debug(`Processing key: ${currentKey}, value:`, value);
+        this.logger.debug(`Processing key: ${currentKey}, value:`, value);
 
         if (typeof value === "object" && value !== null && !Array.isArray(value))
           lines.push(`${currentKey}:`);
@@ -96,7 +92,7 @@ class Config {
           const value = config[currentKey][subKey];
           const comment = line.includes("#") ? " #" + line.split("#")[1] : "";
           lines.push(`  ${subKey}: ${value}${comment}`);
-          logger.debug(`Processing subkey: ${currentKey}.${subKey}, value:`, value);
+          this.logger.debug(`Processing subkey: ${currentKey}.${subKey}, value:`, value);
         }
       } else
         lines.push(line);
@@ -104,7 +100,7 @@ class Config {
     }
 
     configContent = lines.join("\n");
-    logger.debug("New content to write:", configContent);
+    this.logger.debug("New content to write:", configContent);
 
     try {
       const dir = path.dirname(this.configDir);
@@ -113,20 +109,20 @@ class Config {
 
 
       fs.writeFileSync(this.configDir, configContent, "utf8");
-      logger.info("Config has been saved to file");
+      this.logger.info("Config has been saved to file");
     } catch (error) {
-      logger.error("Failed to write config:", error);
+      this.logger.error("Failed to write config:", error);
     }
 
     try {
       fs.writeFileSync(this.configDir, configContent, "utf8");
-      logger.info("Config has been saved to file");
+      this.logger.info("Config has been saved to file");
 
       if (ipcRenderer)
         ipcRenderer.send("config-updated");
 
     } catch (error) {
-      logger.error("Failed to write config:", error);
+      this.logger.error("Failed to write config:", error);
     }
 
     this.config = config;
@@ -134,7 +130,7 @@ class Config {
 
   checkConfigVersion() {
     if (this.default_config.ver > (this.config?.ver ?? 0)) {
-      logger.warn(`Updating config from version ${this.config?.ver ?? 0} to ${this.default_config.ver}`);
+      this.logger.warn(`Updating config from version ${this.config?.ver ?? 0} to ${this.default_config.ver}`);
 
       let configContent = fs.readFileSync(this.defaultDir, "utf8");
       const lines = configContent.split("\n");
@@ -189,10 +185,10 @@ class Config {
 
       const backupPath = `${this.configDir}.backup`;
       fs.copyFileSync(this.configDir, backupPath);
-      logger.info(`Backup created at: ${backupPath}`);
+      this.logger.info(`Backup created at: ${backupPath}`);
 
       fs.writeFileSync(this.configDir, configContent);
-      logger.info("Config file updated successfully");
+      this.logger.info("Config file updated successfully");
 
       this.config = newConfig;
     }
@@ -201,11 +197,8 @@ class Config {
   getConfig(refresh = false) {
     if (refresh)
       this.readConfigYaml();
-
     return this.config;
   }
 }
-
-new Config();
 
 module.exports = Config;
