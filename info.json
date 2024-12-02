@@ -1,0 +1,13 @@
+{
+  "name": "config",
+  "version": "1.0.0",
+  "description": {
+    "zh_tw": "一個讀取 yml 檔案的擴充"
+  },
+  "author": ["whes1015"],
+  "dependencies": {
+    "trem": ">=3.1.0"
+  },
+  "resources": ["AGPL-3.0"],
+  "link": "https://github.com/ExpTechTW/TREM-Example-Plugin"
+}
