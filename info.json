@@ -1,6 +1,6 @@
 {
   "name": "config",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": {
     "zh_tw": "一個讀取 yml 檔案的擴充"
   },
