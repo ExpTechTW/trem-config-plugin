@@ -3,11 +3,11 @@ const yaml = require("js-yaml");
 const path = require("path");
 
 class Config {
-  static instance = null;
+  static instance = {};
 
-  constructor(logger, defaultDir, configDir) {
-    if (Config.instance)
-      return Config.instance;
+  constructor(name, logger, defaultDir, configDir) {
+    if (!name) throw new Error("Name not found!");
+    if (Config.instance[name]) return Config.instance[name];
 
     this.logger = logger;
 
@@ -22,7 +22,7 @@ class Config {
     this.readConfigYaml();
     this.checkConfigVersion();
 
-    Config.instance = this;
+    Config.instance[name] = this;
   }
 
   resetConfig() {
@@ -31,18 +31,15 @@ class Config {
       this.logger.info("Config has been reset to default");
       this.readConfigYaml();
 
-      if (ipcRenderer)
-        ipcRenderer.send("config-updated");
-
+      if (ipcRenderer) ipcRenderer.send("config-updated");
     } catch (error) {
       this.logger.error("Failed to reset config:", error);
     }
   }
 
-  static getInstance() {
-    if (!Config.instance)
-      new Config();
-    return Config.instance;
+  static getInstance(name) {
+    if (!Config.instance[name]) new Config();
+    return Config.instance[name];
   }
 
   checkConfigExists() {
@@ -77,26 +74,28 @@ class Config {
         const value = config[currentKey];
         this.logger.debug(`Processing key: ${currentKey}, value:`, value);
 
-        if (typeof value === "object" && value !== null && !Array.isArray(value))
+        if (
+          typeof value === "object" &&
+          value !== null &&
+          !Array.isArray(value)
+        )
           lines.push(`${currentKey}:`);
-
-        else
-          lines.push(`${currentKey}: ${value}`);
-
+        else lines.push(`${currentKey}: ${value}`);
       } else if (indentedKeyMatch && currentKey) {
         const subKey = indentedKeyMatch[1] || indentedKeyMatch[2];
         if (
-          config[currentKey]
-          && typeof config[currentKey][subKey] !== "undefined"
+          config[currentKey] &&
+          typeof config[currentKey][subKey] !== "undefined"
         ) {
           const value = config[currentKey][subKey];
           const comment = line.includes("#") ? " #" + line.split("#")[1] : "";
           lines.push(`  ${subKey}: ${value}${comment}`);
-          this.logger.debug(`Processing subkey: ${currentKey}.${subKey}, value:`, value);
+          this.logger.debug(
+            `Processing subkey: ${currentKey}.${subKey}, value:`,
+            value
+          );
         }
-      } else
-        lines.push(line);
-
+      } else lines.push(line);
     }
 
     configContent = lines.join("\n");
@@ -104,9 +103,7 @@ class Config {
 
     try {
       const dir = path.dirname(this.configDir);
-      if (!fs.existsSync(dir))
-        fs.mkdirSync(dir, { recursive: true });
-
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
       fs.writeFileSync(this.configDir, configContent, "utf8");
       this.logger.info("Config has been saved to file");
@@ -118,9 +115,7 @@ class Config {
       fs.writeFileSync(this.configDir, configContent, "utf8");
       this.logger.info("Config has been saved to file");
 
-      if (ipcRenderer)
-        ipcRenderer.send("config-updated");
-
+      if (ipcRenderer) ipcRenderer.send("config-updated");
     } catch (error) {
       this.logger.error("Failed to write config:", error);
     }
@@ -130,7 +125,11 @@ class Config {
 
   checkConfigVersion() {
     if (this.default_config.ver > (this.config?.ver ?? 0)) {
-      this.logger.warn(`Updating config from version ${this.config?.ver ?? 0} to ${this.default_config.ver}`);
+      this.logger.warn(
+        `Updating config from version ${this.config?.ver ?? 0} to ${
+          this.default_config.ver
+        }`
+      );
 
       let configContent = fs.readFileSync(this.defaultDir, "utf8");
       const lines = configContent.split("\n");
@@ -140,15 +139,15 @@ class Config {
       const newConfig = JSON.parse(JSON.stringify(this.default_config));
       for (const key in this.config)
         if (this.config[key] !== null && this.config[key] !== undefined)
-          if (typeof this.config[key] === "object" && !Array.isArray(this.config[key]))
+          if (
+            typeof this.config[key] === "object" &&
+            !Array.isArray(this.config[key])
+          )
             newConfig[key] = {
               ...newConfig[key],
               ...this.config[key],
             };
-
-          else
-            newConfig[key] = this.config[key];
-
+          else newConfig[key] = this.config[key];
 
       newConfig.ver = this.default_config.ver;
 
@@ -160,25 +159,24 @@ class Config {
           currentKey = keyMatch[1] || keyMatch[2];
           const value = newConfig[currentKey];
 
-          if (typeof value === "object" && value !== null && !Array.isArray(value))
+          if (
+            typeof value === "object" &&
+            value !== null &&
+            !Array.isArray(value)
+          )
             newLines.push(`${currentKey}:`);
-
-          else
-            newLines.push(`${currentKey}: ${value}`);
-
+          else newLines.push(`${currentKey}: ${value}`);
         } else if (indentedKeyMatch && currentKey) {
           const subKey = indentedKeyMatch[1] || indentedKeyMatch[2];
           if (
-            newConfig[currentKey]
-            && typeof newConfig[currentKey][subKey] !== "undefined"
+            newConfig[currentKey] &&
+            typeof newConfig[currentKey][subKey] !== "undefined"
           ) {
             const value = newConfig[currentKey][subKey];
             const comment = line.includes("#") ? " #" + line.split("#")[1] : "";
             newLines.push(`  ${subKey}: ${value}${comment}`);
           }
-        } else
-          newLines.push(line);
-
+        } else newLines.push(line);
       }
 
       configContent = newLines.join("\n");
@@ -195,8 +193,7 @@ class Config {
   }
 
   getConfig(refresh = false) {
-    if (refresh)
-      this.readConfigYaml();
+    if (refresh) this.readConfigYaml();
     return this.config;
   }
 }
