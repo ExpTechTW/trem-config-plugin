@@ -1,15 +1,15 @@
-const fs = require("fs-extra");
 const yaml = require("js-yaml");
 const path = require("path");
 
 class Config {
   static instance = {};
 
-  constructor(name, logger, defaultDir, configDir) {
+  constructor(name, logger, fs, defaultDir, configDir) {
     if (!name) throw new Error("Name not found!");
     if (Config.instance[name]) return Config.instance[name];
 
     this.logger = logger;
+    this.fs = fs;
 
     this.default_config = {};
     this.config = {};
@@ -27,7 +27,7 @@ class Config {
 
   resetConfig() {
     try {
-      fs.copyFileSync(this.defaultDir, this.configDir);
+      this.fs.copyFileSync(this.defaultDir, this.configDir);
       this.logger.info("Config has been reset to default");
       this.readConfigYaml();
 
@@ -43,17 +43,17 @@ class Config {
   }
 
   checkConfigExists() {
-    if (!fs.existsSync(this.configDir))
-      fs.copySync(this.defaultDir, this.configDir);
+    if (!this.fs.existsSync(this.configDir))
+      this.fs.copySync(this.defaultDir, this.configDir);
   }
 
   readDefaultYaml() {
-    const raw = fs.readFileSync(this.defaultDir).toString();
+    const raw = this.fs.readFileSync(this.defaultDir).toString();
     this.default_config = yaml.load(raw);
   }
 
   readConfigYaml() {
-    const raw = fs.readFileSync(this.configDir).toString();
+    const raw = this.fs.readFileSync(this.configDir).toString();
     this.config = yaml.load(raw);
   }
 
@@ -61,9 +61,16 @@ class Config {
     this.logger.debug("Writing config:", JSON.stringify(config, null, 2));
 
     const lines = [];
-    let configContent = fs.readFileSync(this.defaultDir, "utf8");
+    let configContent = this.fs.readFileSync(this.defaultDir, "utf8");
     const templateLines = configContent.split("\n");
     let currentKey = "";
+
+    const escapeValue = (value) => {
+      if (typeof value === 'string' && value.includes('@')) {
+          return `'${value}'`;
+      }
+      return value;
+    };
 
     for (const line of templateLines) {
       const keyMatch = line.match(/^(\w+):|^([\w-]+):/);
@@ -80,7 +87,7 @@ class Config {
           !Array.isArray(value)
         )
           lines.push(`${currentKey}:`);
-        else lines.push(`${currentKey}: ${value}`);
+        else lines.push(`${currentKey}: ${escapeValue(value)}`);
       } else if (indentedKeyMatch && currentKey) {
         const subKey = indentedKeyMatch[1] || indentedKeyMatch[2];
         if (
@@ -89,7 +96,7 @@ class Config {
         ) {
           const value = config[currentKey][subKey];
           const comment = line.includes("#") ? " #" + line.split("#")[1] : "";
-          lines.push(`  ${subKey}: ${value}${comment}`);
+          lines.push(`  ${subKey}: ${escapeValue(value)}${comment}`);
           this.logger.debug(
             `Processing subkey: ${currentKey}.${subKey}, value:`,
             value
@@ -103,19 +110,19 @@ class Config {
 
     try {
       const dir = path.dirname(this.configDir);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      if (!this.fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-      fs.writeFileSync(this.configDir, configContent, "utf8");
+      this.fs.writeFileSync(this.configDir, configContent, "utf8");
       this.logger.info("Config has been saved to file");
     } catch (error) {
       this.logger.error("Failed to write config:", error);
     }
 
     try {
-      fs.writeFileSync(this.configDir, configContent, "utf8");
+      this.fs.writeFileSync(this.configDir, configContent, "utf8");
       this.logger.info("Config has been saved to file");
 
-      if (ipcRenderer) ipcRenderer.send("config-updated");
+      // if (ipcRenderer) ipcRenderer.send("config-updated");
     } catch (error) {
       this.logger.error("Failed to write config:", error);
     }
@@ -131,7 +138,7 @@ class Config {
         }`
       );
 
-      let configContent = fs.readFileSync(this.defaultDir, "utf8");
+      let configContent = this.fs.readFileSync(this.defaultDir, "utf8");
       const lines = configContent.split("\n");
       const newLines = [];
       let currentKey = "";
@@ -182,10 +189,10 @@ class Config {
       configContent = newLines.join("\n");
 
       const backupPath = `${this.configDir}.backup`;
-      fs.copyFileSync(this.configDir, backupPath);
+      this.fs.copyFileSync(this.configDir, backupPath);
       this.logger.info(`Backup created at: ${backupPath}`);
 
-      fs.writeFileSync(this.configDir, configContent);
+      this.fs.writeFileSync(this.configDir, configContent);
       this.logger.info("Config file updated successfully");
 
       this.config = newConfig;
