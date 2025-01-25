@@ -1,13 +1,18 @@
 {
   "name": "config",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": {
     "zh_tw": "一個讀取 yml 檔案的擴充"
   },
-  "author": ["whes1015","yayacat"],
+  "author": [
+    "whes1015",
+    "yayacat"
+  ],
   "dependencies": {
     "trem": ">=3.1.0-rc.1"
   },
-  "resources": ["AGPL-3.0"],
+  "resources": [
+    "AGPL-3.0"
+  ],
   "link": "https://github.com/ExpTechTW/trem-config-plugin"
 }
